@@ -13,6 +13,14 @@ type valueTestCase struct {
 	Result map[string]interface{}
 }
 
+func _doTest(d *Decoder, t *testing.T, cases []valueTestCase) {
+	for _, c := range cases {
+		res := d.parseValues(c.Input)
+		assert.Equal(t, c.Result, res, "parse %v not equal.", c.Input)
+		t.Logf("parse from %v\t to %v\n", c.Input, res)
+	}
+}
+
 func TestParseValue(t *testing.T) {
 	cases := []valueTestCase{
 		{"0=foo", map[string]interface{}{"0": "foo"}},
@@ -23,13 +31,22 @@ func TestParseValue(t *testing.T) {
 		{"a[==]=23", map[string]interface{}{"a[==]": "23"}},
 		{"a[1]=3&a[2]=4", map[string]interface{}{"a[1]": "3", "a[2]": "4"}},
 		{"a.b=3&a[]=4", map[string]interface{}{"a.b": "3", "a[]": "4"}},
+		{"foo=a,b", map[string]interface{}{"foo": "a,b"}},
+		{"foo[]=a,b", map[string]interface{}{"foo[]": "a,b"}},
 	}
 
 	d := NewDecoder()
+	_doTest(d, t, cases)
+}
 
-	for _, c := range cases {
-		res := d.parseValues(c.Input)
-		assert.Equal(t, c.Result, res, "parse %v not equal.", c.Input)
-		t.Logf("parse from %v\t to %v\n", c.Input, res)
+func TestParseValueWithComma(t *testing.T) {
+	cases := []valueTestCase{
+		{"foo=a,b", map[string]interface{}{"foo": []interface{}{"a", "b"}}},
+		{"foo=a,b&foo=c", map[string]interface{}{"foo": []interface{}{"a", "b", "c"}}},
+		{"foo[]=a,b", map[string]interface{}{"foo[]": []interface{}{[]interface{}{"a", "b"}}}},
+		{"foo[]=a,b&foo[]=c", map[string]interface{}{"foo[]": []interface{}{[]interface{}{"a", "b"}, "c"}}},
 	}
+
+	d := NewDecoder(WithComma(true))
+	_doTest(d, t, cases)
 }

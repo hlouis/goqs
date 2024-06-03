@@ -58,8 +58,18 @@ var defaultDecoder Decoder = Decoder{
 type DecoderOption func(encoder *Decoder)
 
 func WithTagAlias(tagAlias string) DecoderOption {
-	return func(e *Decoder) {
-		e.tagAlias = tagAlias
+	return func(d *Decoder) {
+		d.tagAlias = tagAlias
+	}
+}
+
+// WithComma will enable/disable comman in value
+// if enabled, comma in value will parse to array
+// e.g: v=a,b,c => v:[a,b,c]
+// default: false
+func WithComma(comma bool) DecoderOption {
+	return func(d *Decoder) {
+		d.comma = comma
 	}
 }
 
@@ -130,15 +140,15 @@ func (d *Decoder) parseValues(str string) map[string]interface{} {
 			key = decodeURI(part[0:pos])
 			strv := decodeURI(part[pos+1:])
 			if d.comma && strings.Contains(strv, ",") {
-				val = strings.Split(strv, ",")
+				val = split(strv, ",")
 			} else {
 				val = strv
 			}
 		}
 
-		// TODO: figure this part out
-		// if strings.Contains(part, "[]=") {
-		// }
+		if strings.Contains(part, "[]=") && IsArrayLike(val) {
+			val = []interface{}{val}
+		}
 
 		ev, existing := result[key]
 		if existing && d.duplicates == "combine" {
@@ -149,6 +159,15 @@ func (d *Decoder) parseValues(str string) map[string]interface{} {
 	}
 
 	return result
+}
+
+func split(str string, sep string) []interface{} {
+	val := strings.Split(str, sep)
+	ret := make([]interface{}, len(val))
+	for i, v := range val {
+		ret[i] = v
+	}
+	return ret
 }
 
 var (
