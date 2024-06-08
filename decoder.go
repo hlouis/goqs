@@ -15,7 +15,7 @@ type Decoder struct {
 	allowDots                bool
 	allowEmptyArrays         bool
 	allowPrototypes          bool // not support
-	allowSparse              bool
+	allowSparse              bool // always false, golang did not support sparse array
 	arrayLimit               int
 	charset                  string // not support
 	charsetSentinel          bool   // not support
@@ -89,6 +89,7 @@ func (d *Decoder) Parse(input string) (*QSType, error) {
 		return obj, nil
 	}
 
+	// parse all values
 	// tempObj := d.parseValues(input)
 
 	// Iterate over the keys and setup the new object
@@ -105,6 +106,8 @@ func (d *Decoder) Parse(input string) (*QSType, error) {
 	return obj, nil
 }
 
+// parse value in query string
+// return array for each query pair
 func (d *Decoder) parseValues(str string) map[string]interface{} {
 	// clear first query prefix if any
 	if d.ignoreQueryPrefix && str[0] == '?' {
@@ -175,7 +178,7 @@ var (
 	bracketReg = regexp.MustCompile(`(\[[^[\]]*])`)
 )
 
-func (d *Decoder) parseKeys(key string, val interface{}) interface{} {
+func (d *Decoder) parseKeys(key string, val interface{}) QSType {
 	if d.allowDots {
 		// convert dot string to bracket format (a.b.c => a[b][c])
 		key = dotReg.ReplaceAllString(key, "[$1]")
@@ -197,7 +200,7 @@ func (d *Decoder) parseKeys(key string, val interface{}) interface{} {
 
 			// add any reminder as it is
 			lastLoc := locs[len(locs)-1]
-			if lastLoc[1] >= len(key)-1 {
+			if lastLoc[1] < len(key)-1 {
 				keys = append(keys, fmt.Sprintf("[%v]", key[lastLoc[1]:]))
 			}
 		}
@@ -206,12 +209,14 @@ func (d *Decoder) parseKeys(key string, val interface{}) interface{} {
 		keys = append(keys, key)
 	}
 
-	// convert string bracket to map
 	leaf := val
+	// convert string bracket to map
+	// loop from leaf element to root
 	for i := len(keys) - 1; i >= 0; i-- {
 		var obj interface{}
 		root := keys[i]
 		if root == "[]" && d.parseArrays {
+			// f[]=3 => f : []string{"3"}
 			if d.allowEmptyArrays && leaf == nil {
 				obj = []interface{}{}
 			} else {
@@ -221,25 +226,31 @@ func (d *Decoder) parseKeys(key string, val interface{}) interface{} {
 			cleanRoot := root
 			if root[0] == '[' && root[len(root)-1] == ']' {
 				cleanRoot = root[1 : len(root)-1]
-				decodedRoot := cleanRoot
-				if d.decodeDotInKeys {
-					decodedRoot = strings.ReplaceAll(cleanRoot, "%2E", ".")
-				}
-				index, err := strconv.ParseInt(decodedRoot, 10, 32)
-				if !d.parseArrays && decodedRoot == "" {
-					obj = map[int]interface{}{0: leaf}
-				} else if err != nil && root != decodedRoot && index > 0 && (d.parseArrays && index <= int64(d.arrayLimit)) {
-					obj = map[int64]interface{}{index: leaf}
-				} else {
-					obj = map[string]interface{}{decodedRoot: leaf}
-				}
+			}
+
+			decodedRoot := cleanRoot
+			if d.decodeDotInKeys {
+				decodedRoot = strings.ReplaceAll(cleanRoot, "%2E", ".")
+			}
+
+			index, err := strconv.ParseInt(decodedRoot, 10, 32)
+			if !d.parseArrays && decodedRoot == "" {
+				// if we do not need parse array but there is a [], we use map and string key "0"
+				obj = map[interface{}]interface{}{"0": leaf}
+			} else if err != nil && root != decodedRoot && index > 0 && (d.parseArrays && index <= int64(d.arrayLimit)) {
+				// if we need parseArray, use number as the key
+				obj = map[interface{}]interface{}{index: leaf}
+			} else {
+				// none above use key as it is
+				obj = map[interface{}]interface{}{decodedRoot: leaf}
 			}
 		}
 
 		leaf = obj
 	}
 
-	return leaf
+	temp := leaf.(map[interface{}]interface{})
+	return QSType(temp)
 }
 
 func decodeURI(v string) string {

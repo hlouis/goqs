@@ -50,3 +50,25 @@ func TestParseValueWithComma(t *testing.T) {
 	d := NewDecoder(WithComma(true))
 	_doTest(d, t, cases)
 }
+
+type keyTestCase struct {
+	Key    string
+	Val    interface{}
+	Result QSType
+}
+
+func TestParseKeys(t *testing.T) {
+	cases := []keyTestCase{
+		{"foo[]", []interface{}{"a", "b"}, QSType{"foo": []interface{}{"a", "b"}}},
+		{"foo[1]", []interface{}{"a", "b"}, QSType{"foo": map[interface{}]interface{}{"1": []interface{}{"a", "b"}}}},
+		{"a.b", "apple", QSType{"a.b": "apple"}},
+		{"a.b[]", "apple", QSType{"a.b": []interface{}{"apple"}}},
+	}
+
+	d := NewDecoder()
+	for _, c := range cases {
+		res := d.parseKeys(c.Key, c.Val)
+		assert.Equal(t, c.Result, res, "parse %v not equal!", c.Key)
+		t.Logf("parse key from %v:%v\t to %v\n", c.Key, c.Val, res)
+	}
+}
