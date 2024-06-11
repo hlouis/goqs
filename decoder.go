@@ -84,9 +84,10 @@ func NewDecoder(options ...DecoderOption) *Decoder {
 }
 
 func (d *Decoder) Parse(input string) (*QSType, error) {
-	obj := QSType{}
+	obj := map[interface{}]interface{}{}
+	temp := QSType(obj)
 	if len(input) == 0 {
-		return &obj, nil
+		return &temp, nil
 	}
 
 	// parse all values
@@ -98,14 +99,13 @@ func (d *Decoder) Parse(input string) (*QSType, error) {
 		newObj := d.parseKeys(k, v)
 		t = merge(t, newObj)
 	}
-	obj = t.(QSType)
 
 	// if d.allowSparse {
 	// 	return obj, nil
 	// }
 	//
 	// return compact(obj), nil
-	return &obj, nil
+	return &temp, nil
 }
 
 // parse value in query string
@@ -180,7 +180,7 @@ var (
 	bracketReg = regexp.MustCompile(`(\[[^[\]]*])`)
 )
 
-func (d *Decoder) parseKeys(key string, val interface{}) QSType {
+func (d *Decoder) parseKeys(key string, val interface{}) map[interface{}]interface{} {
 	if d.allowDots {
 		// convert dot string to bracket format (a.b.c => a[b][c])
 		key = dotReg.ReplaceAllString(key, "[$1]")
@@ -253,7 +253,7 @@ func (d *Decoder) parseKeys(key string, val interface{}) QSType {
 
 	// TODO: handler type assert fail
 	temp := leaf.(map[interface{}]interface{})
-	return QSType(temp)
+	return temp
 }
 
 func decodeURI(v string) string {
