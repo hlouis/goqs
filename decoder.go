@@ -84,7 +84,7 @@ func NewDecoder(options ...DecoderOption) *Decoder {
 }
 
 func (d *Decoder) Parse(input string) (*QSType, error) {
-	obj := map[interface{}]interface{}{}
+	obj := QSType{}
 	temp := QSType(obj)
 	if len(input) == 0 {
 		return &temp, nil
@@ -180,7 +180,7 @@ var (
 	bracketReg = regexp.MustCompile(`(\[[^[\]]*])`)
 )
 
-func (d *Decoder) parseKeys(key string, val interface{}) map[interface{}]interface{} {
+func (d *Decoder) parseKeys(key string, val interface{}) QSType {
 	if d.allowDots {
 		// convert dot string to bracket format (a.b.c => a[b][c])
 		key = dotReg.ReplaceAllString(key, "[$1]")
@@ -238,13 +238,13 @@ func (d *Decoder) parseKeys(key string, val interface{}) map[interface{}]interfa
 			index, err := strconv.ParseInt(decodedRoot, 10, 32)
 			if !d.parseArrays && decodedRoot == "" {
 				// if we do not need parse array but there is a [], we use map and string key "0"
-				obj = map[interface{}]interface{}{"0": leaf}
+				obj = QSType{"0": leaf}
 			} else if err != nil && root != decodedRoot && index > 0 && (d.parseArrays && index <= int64(d.arrayLimit)) {
 				// if we need parseArray, use number as the key
-				obj = map[interface{}]interface{}{index: leaf}
+				obj = QSType{index: leaf}
 			} else {
 				// none above use key as it is
-				obj = map[interface{}]interface{}{decodedRoot: leaf}
+				obj = QSType{decodedRoot: leaf}
 			}
 		}
 
@@ -252,7 +252,7 @@ func (d *Decoder) parseKeys(key string, val interface{}) map[interface{}]interfa
 	}
 
 	// TODO: handler type assert fail
-	temp := leaf.(map[interface{}]interface{})
+	temp := leaf.(QSType)
 	return temp
 }
 
@@ -328,7 +328,7 @@ func merge(target interface{}, source interface{}) interface{} {
 			tArr := target.([]interface{})
 			target = append(tArr, source)
 		case reflect.Map:
-			tMap := target.(map[interface{}]interface{})
+			tMap := target.(QSType)
 			if _, exist := tMap[source]; !exist {
 				tMap[source] = true
 			}
@@ -366,12 +366,12 @@ func merge(target interface{}, source interface{}) interface{} {
 	}
 
 	// convert target to array, only m,a m,m left
-	var mergeTarget map[interface{}]interface{}
+	var mergeTarget QSType
 	if tk == reflect.Slice && sk != reflect.Slice {
 		tArr := target.([]interface{})
 		mergeTarget = arrayToObj(tArr)
 	} else {
-		mergeTarget = target.(map[interface{}]interface{})
+		mergeTarget = target.(QSType)
 	}
 
 	if sk == reflect.Slice {
@@ -386,7 +386,7 @@ func merge(target interface{}, source interface{}) interface{} {
 		}
 	} else {
 		// source is map: m,m
-		mapS := source.(map[interface{}]interface{})
+		mapS := source.(QSType)
 		for k, v := range mapS {
 			if tv, exist := mergeTarget[k]; exist {
 				mergeTarget[k] = merge(tv, v)
@@ -399,8 +399,8 @@ func merge(target interface{}, source interface{}) interface{} {
 	return mergeTarget
 }
 
-func arrayToObj(arr []interface{}) map[interface{}]interface{} {
-	ret := make(map[interface{}]interface{}, len(arr))
+func arrayToObj(arr []interface{}) QSType {
+	ret := make(QSType, len(arr))
 	for i := 0; i < len(arr); i++ {
 		ret[i] = arr[i]
 	}

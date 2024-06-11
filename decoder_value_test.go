@@ -60,7 +60,7 @@ type keyTestCase struct {
 func TestParseKeys(t *testing.T) {
 	cases := []keyTestCase{
 		{"foo[]", []interface{}{"a", "b"}, QSType{"foo": []interface{}{"a", "b"}}},
-		{"foo[1]", []interface{}{"a", "b"}, QSType{"foo": map[interface{}]interface{}{"1": []interface{}{"a", "b"}}}},
+		{"foo[1]", []interface{}{"a", "b"}, QSType{"foo": QSType{"1": []interface{}{"a", "b"}}}},
 		{"a.b", "apple", QSType{"a.b": "apple"}},
 		{"a.b[]", "apple", QSType{"a.b": []interface{}{"apple"}}},
 	}
