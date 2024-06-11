@@ -84,26 +84,28 @@ func NewDecoder(options ...DecoderOption) *Decoder {
 }
 
 func (d *Decoder) Parse(input string) (*QSType, error) {
-	obj := &QSType{}
+	obj := QSType{}
 	if len(input) == 0 {
-		return obj, nil
+		return &obj, nil
 	}
 
 	// parse all values
-	// tempObj := d.parseValues(input)
+	tempObj := d.parseValues(input)
 
+	var t interface{} = obj
 	// Iterate over the keys and setup the new object
-	// for k, v := range tempObj {
-	// 	newObj := d.parseKeys(k, v)
-	// 	obj = merge(obj, newObj)
-	// }
+	for k, v := range tempObj {
+		newObj := d.parseKeys(k, v)
+		t = merge(t, newObj)
+	}
+	obj = t.(QSType)
 
 	// if d.allowSparse {
 	// 	return obj, nil
 	// }
 	//
 	// return compact(obj), nil
-	return obj, nil
+	return &obj, nil
 }
 
 // parse value in query string
@@ -249,6 +251,7 @@ func (d *Decoder) parseKeys(key string, val interface{}) QSType {
 		leaf = obj
 	}
 
+	// TODO: handler type assert fail
 	temp := leaf.(map[interface{}]interface{})
 	return QSType(temp)
 }
@@ -318,48 +321,77 @@ func merge(target interface{}, source interface{}) interface{} {
 	tk := reflect.TypeOf(target).Kind()
 	sk := reflect.TypeOf(source).Kind()
 
-	// if source is not a map
-	if sk != reflect.Map {
-		if IsArrayLike(target) {
+	// if source is not a object
+	if sk != reflect.Map && sk != reflect.Slice {
+		switch tk {
+		case reflect.Slice, reflect.Array:
 			tArr := target.([]interface{})
 			target = append(tArr, source)
-		} else if tk == reflect.Map {
+		case reflect.Map:
 			tMap := target.(map[interface{}]interface{})
 			if _, exist := tMap[source]; !exist {
 				tMap[source] = true
 			}
-		} else {
+		default:
 			return []interface{}{target, source}
 		}
 
 		return target
 	}
 
-	mergeTarget := target
-	// target is not exist or not map
-	if target == nil || tk != reflect.Map {
+	// target is not exist or not map or array
+	if target == nil || (tk != reflect.Map && tk != reflect.Slice) {
 		return concat([]interface{}{target}, source)
 	}
 
-	// target is a array but source is not
-	if tk == reflect.Slice && sk != reflect.Slice {
-		tArr := target.([]interface{})
-		mergeTarget = arrayToObj(tArr)
-	}
+	//
+	// after above, target and source must be array or map
+	//
 
-	// both array
+	// 1. both array
 	if tk == reflect.Slice && sk == reflect.Slice {
-		tArr := target.([]interface{})
-		tSrc := source.([]interface{})
-		for i, item := range tSrc {
-			if i < len(tArr) {
+		arrT := target.([]interface{})
+		arrS := source.([]interface{})
+		for i, item := range arrS {
+			if i < len(arrT) {
 				// if both object, deep merge
 				// else append
 				// targetItem := tArr[i]
-				tArr[i] = merge(tArr[i], item)
+				arrT[i] = merge(arrT[i], item)
 			} else {
-				// TODO: crashed here
-				tArr[i] = item
+				arrT = append(arrT, item)
+			}
+		}
+		return arrT
+	}
+
+	// convert target to array, only m,a m,m left
+	var mergeTarget map[interface{}]interface{}
+	if tk == reflect.Slice && sk != reflect.Slice {
+		tArr := target.([]interface{})
+		mergeTarget = arrayToObj(tArr)
+	} else {
+		mergeTarget = target.(map[interface{}]interface{})
+	}
+
+	if sk == reflect.Slice {
+		// source is array: m,a
+		arrS := source.([]interface{})
+		for i := 0; i < len(arrS); i++ {
+			if tv, exist := mergeTarget[i]; exist {
+				mergeTarget[i] = merge(tv, arrS[i])
+			} else {
+				mergeTarget[i] = arrS[i]
+			}
+		}
+	} else {
+		// source is map: m,m
+		mapS := source.(map[interface{}]interface{})
+		for k, v := range mapS {
+			if tv, exist := mergeTarget[k]; exist {
+				mergeTarget[k] = merge(tv, v)
+			} else {
+				mergeTarget[k] = v
 			}
 		}
 	}
@@ -367,8 +399,8 @@ func merge(target interface{}, source interface{}) interface{} {
 	return mergeTarget
 }
 
-func arrayToObj(arr []interface{}) map[int]interface{} {
-	ret := make(map[int]interface{}, len(arr))
+func arrayToObj(arr []interface{}) map[interface{}]interface{} {
+	ret := make(map[interface{}]interface{}, len(arr))
 	for i := 0; i < len(arr); i++ {
 		ret[i] = arr[i]
 	}
