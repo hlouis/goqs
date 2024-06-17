@@ -239,7 +239,7 @@ func (d *Decoder) parseKeys(key string, val interface{}) QSType {
 			if !d.parseArrays && decodedRoot == "" {
 				// if we do not need parse array but there is a [], we use map and string key "0"
 				obj = QSType{"0": leaf}
-			} else if err != nil && root != decodedRoot && index > 0 && (d.parseArrays && index <= int64(d.arrayLimit)) {
+			} else if err == nil && root != decodedRoot && index >= 0 && (d.parseArrays && index <= int64(d.arrayLimit)) {
 				// if we need parseArray, use number as the key
 				obj = QSType{index: leaf}
 			} else {
