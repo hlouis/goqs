@@ -57,3 +57,33 @@ func TestParseSimpleString(t *testing.T) {
 	d := NewDecoder()
 	_test(d, t, cases)
 }
+
+func TestParseNoComma(t *testing.T) {
+	cases := []testCase{
+		{"a[]=b&a[]=c", &QSType{"a": []interface{}{"b", "c"}}},
+		{"a[0]=b&a[1]=c", &QSType{"a": []interface{}{"b", "c"}}},
+		{"a=b,c", &QSType{"a": "b,c"}},
+		{"a=b&a=c", &QSType{"a": []interface{}{"b", "c"}}},
+	}
+
+	d := NewDecoder()
+	_test(d, t, cases)
+}
+
+func TestParseComma(t *testing.T) {
+	cases := []testCase{
+		{"a[0]=a,b&a[1]=c,d", &QSType{"a": []interface{}{[]interface{}{"a", "b"}, []interface{}{"c", "d"}}}},
+	}
+
+	d := NewDecoder(WithComma(true))
+	_test(d, t, cases)
+}
+
+func TestDebug(t *testing.T) {
+	cases := []testCase{
+		{"a[0]=b&a[1]=c", &QSType{"a": []interface{}{"b", "c"}}},
+	}
+
+	d := NewDecoder()
+	_test(d, t, cases)
+}

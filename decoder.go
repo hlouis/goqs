@@ -103,8 +103,10 @@ func (d *Decoder) Parse(input string) (*QSType, error) {
 	// if d.allowSparse {
 	// 	return obj, nil
 	// }
-	//
-	// return compact(obj), nil
+
+	for k, v := range temp {
+		temp[k] = objToArray(v)
+	}
 	return &temp, nil
 }
 
@@ -235,12 +237,12 @@ func (d *Decoder) parseKeys(key string, val interface{}) QSType {
 				decodedRoot = strings.ReplaceAll(cleanRoot, "%2E", ".")
 			}
 
-			index, err := strconv.ParseInt(decodedRoot, 10, 32)
+			index, err := strconv.Atoi(decodedRoot)
 			if !d.parseArrays && decodedRoot == "" {
 				// if we do not need parse array but there is a [], we use map and string key "0"
 				obj = QSType{"0": leaf}
-			} else if err == nil && root != decodedRoot && index >= 0 && (d.parseArrays && index <= int64(d.arrayLimit)) {
-				// if we need parseArray, use number as the key
+			} else if err == nil && root != decodedRoot && index >= 0 && (d.parseArrays && index <= d.arrayLimit) {
+				// if we need parseArray, use number as the key here and try convert to array later
 				obj = QSType{index: leaf}
 			} else {
 				// none above use key as it is
@@ -405,4 +407,48 @@ func arrayToObj(arr []interface{}) QSType {
 		ret[i] = arr[i]
 	}
 	return ret
+}
+
+// turn current map to array if:
+// 1. All keys in current object is number
+// 2. All number keys is continued
+// return origin value if not ok to convert, or an new array
+func objToArray(obj interface{}) interface{} {
+	if reflect.TypeOf(obj).Kind() != reflect.Map {
+		return obj
+	}
+
+	var oMap = obj.(QSType)
+
+	if canBeArray(oMap) {
+		retArr := make([]interface{}, len(oMap))
+		for i := 0; i < len(oMap); i++ {
+			retArr[i] = oMap[i]
+		}
+		return retArr
+	}
+
+	return obj
+}
+
+// canBeArray test this map's keys is continued and all numbers
+func canBeArray(obj QSType) bool {
+	keys := make([]int, 0, len(obj))
+	for k := range obj {
+		kt := reflect.TypeOf(k).Kind()
+		if kt == reflect.Int {
+			keys = append(keys, k.(int))
+		} else {
+			// if any key is not int, break
+			return false
+		}
+	}
+	// test keys is continued or not
+	for i := 0; i < len(keys); i++ {
+		if keys[i] != i {
+			return false
+		}
+	}
+
+	return true
 }
