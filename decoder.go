@@ -105,9 +105,7 @@ func (d *Decoder) Parse(input string) (*QSType, error) {
 
 	ret := QSType{}
 	for k, v := range obj {
-		nv := objToArray(v)
-		fmt.Printf("update k, v %v, %v\n", k, nv)
-		ret[k] = nv
+		ret[k] = objToArray(v)
 	}
 	return &ret, nil
 }
@@ -421,7 +419,6 @@ func objToArray(obj interface{}) interface{} {
 	}
 
 	oMap := obj.(QSType)
-
 	if canBeArray(oMap) {
 		retArr := make([]interface{}, len(oMap))
 		for i := 0; i < len(oMap); i++ {
@@ -435,22 +432,10 @@ func objToArray(obj interface{}) interface{} {
 
 // canBeArray test this map's keys is continued and all numbers
 func canBeArray(obj QSType) bool {
-	keys := make([]int, 0, len(obj))
-	for k := range obj {
-		kt := reflect.TypeOf(k).Kind()
-		if kt == reflect.Int {
-			keys = append(keys, k.(int))
-		} else {
-			// if any key is not int, break
+	for i := 0; i < len(obj); i++ {
+		if _, ok := obj[i]; !ok {
 			return false
 		}
 	}
-	// test keys is continued or not
-	for i := 0; i < len(keys); i++ {
-		if keys[i] != i {
-			return false
-		}
-	}
-
 	return true
 }
