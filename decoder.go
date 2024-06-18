@@ -85,9 +85,8 @@ func NewDecoder(options ...DecoderOption) *Decoder {
 
 func (d *Decoder) Parse(input string) (*QSType, error) {
 	obj := QSType{}
-	temp := QSType(obj)
 	if len(input) == 0 {
-		return &temp, nil
+		return &obj, nil
 	}
 
 	// parse all values
@@ -104,10 +103,13 @@ func (d *Decoder) Parse(input string) (*QSType, error) {
 	// 	return obj, nil
 	// }
 
-	for k, v := range temp {
-		temp[k] = objToArray(v)
+	ret := QSType{}
+	for k, v := range obj {
+		nv := objToArray(v)
+		fmt.Printf("update k, v %v, %v\n", k, nv)
+		ret[k] = nv
 	}
-	return &temp, nil
+	return &ret, nil
 }
 
 // parse value in query string
@@ -418,7 +420,7 @@ func objToArray(obj interface{}) interface{} {
 		return obj
 	}
 
-	var oMap = obj.(QSType)
+	oMap := obj.(QSType)
 
 	if canBeArray(oMap) {
 		retArr := make([]interface{}, len(oMap))
