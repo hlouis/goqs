@@ -42,6 +42,7 @@ func TestParseSimpleString(t *testing.T) {
 		{"foo", &QSType{"foo": ""}},
 		{"foo=", &QSType{"foo": ""}},
 		{"foo=bar", &QSType{"foo": "bar"}},
+		{"a.b=bar", &QSType{"a.b": "bar"}},
 		{" foo = bar = baz ", &QSType{" foo ": " bar = baz "}},
 		{"foo=bar&bar=baz", &QSType{"foo": "bar", "bar": "baz"}},
 		{"foo2=bar2&baz2=", &QSType{"foo2": "bar2", "baz2": ""}},
@@ -80,6 +81,15 @@ func TestParseWithComma(t *testing.T) {
 	}
 
 	d := NewDecoder(WithComma(true))
+	_test(d, t, cases)
+}
+
+func TestParseWithAllowDots(t *testing.T) {
+	cases := []testCase{
+		{"a.b=bar", &QSType{"a": QSType{"b": "bar"}}},
+	}
+
+	d := NewDecoder(WithAllowDots(true))
 	_test(d, t, cases)
 }
 

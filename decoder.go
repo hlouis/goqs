@@ -73,6 +73,12 @@ func WithComma(comma bool) DecoderOption {
 	}
 }
 
+func WithAllowDots(allowDots bool) DecoderOption {
+	return func(d *Decoder) {
+		d.allowDots = allowDots
+	}
+}
+
 func NewDecoder(options ...DecoderOption) *Decoder {
 	d := defaultDecoder
 
