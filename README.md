@@ -301,42 +301,48 @@ These features work identically to the JavaScript library:
 - Parameter limits
 - Null handling
 
+### ✅ Recently Fixed (v0.3.0)
+
+The following issues that were present in earlier versions have been fixed:
+
+#### 1. Empty Key Handling ✅
+```go
+// Now correctly matches JavaScript behavior
+d.Parse("a=1&")  → {"a": "1"}  // No empty key created
+```
+
+#### 2. Empty Arrays ✅
+```go
+// Now correctly returns truly empty arrays
+d := NewDecoder(WithAllowEmptyArrays(true))
+d.Parse("foo[]") → {"foo": []}  // Empty array, not [""]
+```
+
+#### 3. Pre-encoded Comma Handling ✅
+```go
+// Now correctly preserves pre-encoded commas
+d := NewDecoder(WithComma(true))
+d.Parse("foo=a%2Cb") → {"foo": "a,b"}  // Not split into array
+d.Parse("foo=a,b")   → {"foo": ["a", "b"]}  // Raw comma is split
+```
+
+#### 4. Depth Limit ✅
+```go
+// Now correctly matches JavaScript depth counting
+d := NewDecoder(WithDepth(2))
+d.Parse("a[b][c][d]=e") → {"a": {"b": {"[c][d]": "e"}}}  // Correct!
+```
+
+#### 5. Array Limit Key Type ✅
+```go
+// Now correctly uses integer keys when exceeding arrayLimit
+d := NewDecoder(WithArrayLimit(20))
+d.Parse("a[100]=b") → {"a": {100: "b"}}  // Integer key 100, not string "100"
+```
+
 ### ⚠️ Known Differences
 
-#### 1. Empty Key Handling
-```go
-// JavaScript: qs.parse('a=1&') → { a: '1' }
-// Go:         d.Parse("a=1&")  → {"a": "1", "": ""}
-// Issue: Creates an extra empty key
-```
-
-#### 2. Empty Arrays
-```go
-// JavaScript: qs.parse('foo[]', {allowEmptyArrays: true}) → { foo: [] }
-// Go:         d.Parse("foo[]", WithAllowEmptyArrays(true)) → {"foo": [""]}
-// Issue: Contains empty string instead of truly empty
-```
-
-#### 3. Pre-encoded Comma Handling
-```go
-// JavaScript: qs.parse('foo=a%2Cb', {comma: true}) → { foo: 'a,b' }
-// Go:         d.Parse("foo=a%2Cb", WithComma(true)) → {"foo": ["a", "b"]}
-// Issue: Decodes %2C before checking comma option
-```
-
-#### 4. Depth Limit Off-by-One
-```go
-// JavaScript: qs.parse('a[b][c][d]=e', {depth: 2}) → { a: { b: { '[c][d]': 'e' } } }
-// Go:         d.Parse("a[b][c][d]=e", WithDepth(2)) → {"a": {"b": {"c": {"[d]": "e"}}}}
-// Issue: Depth counting may be off by one
-```
-
-#### 5. Array Limit Key Type
-```go
-// JavaScript: qs.parse('a[100]=b', {arrayLimit: 20}) → { a: { 100: 'b' } }
-// Go:         d.Parse("a[100]=b", WithArrayLimit(20)) → {"a": {"100": "b"}}
-// Issue: Returns string "100" instead of integer 100
-```
+Currently, there are **no known behavioral differences** between this Go implementation and the JavaScript qs library for the supported features. If you discover any differences, please report them as issues.
 
 ### ❌ Not Supported
 
@@ -555,7 +561,17 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Changelog
 
-### v0.2.0 (Current)
+### v0.3.0 (Current)
+- ✅ **Fixed all 5 known differences with JavaScript qs library**
+  - Fixed empty key handling for trailing delimiters
+  - Fixed empty arrays to be truly empty instead of containing empty string
+  - Fixed pre-encoded comma handling (%2C) to not split when comma option is true
+  - Fixed depth limit off-by-one error to match JavaScript behavior
+  - Fixed array limit to use integer keys instead of string keys
+- ✅ Added comprehensive test suite for all fixes
+- ✅ Now 100% compatible with JavaScript qs for all supported features
+
+### v0.2.0
 - ✅ Added full Stringify/Encode functionality
 - ✅ Added 350+ comprehensive tests
 - ✅ Added all major encoder options

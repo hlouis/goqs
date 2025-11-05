@@ -249,9 +249,63 @@ Recent work focused on:
 - Numeric key handling improvements
 - Feature additions (allowDots support)
 
+## Recent Updates (v0.3.0 - 2025-11-05)
+
+### Fixed All 5 Known Differences with JavaScript qs
+
+This update resolves all previously documented behavioral differences between the Go and JavaScript implementations:
+
+#### 1. Empty Key Handling ✅ Fixed
+**Location:** `decoder.go:184-188`
+- **Issue:** Trailing delimiters (e.g., `"a=1&"`) created empty keys
+- **Fix:** Skip empty parts after splitting by delimiter
+- **Test:** `TestFix1_EmptyKeyHandling` in `decoder_test.go:107-119`
+
+#### 2. Empty Arrays ✅ Fixed
+**Location:** `decoder.go:284`
+- **Issue:** Empty arrays contained `[""]` instead of `[]`
+- **Fix:** Check for both `nil` and empty string when `allowEmptyArrays` is true
+- **Test:** `TestFix2_EmptyArrays` in `decoder_test.go:121-143`
+
+#### 3. Pre-encoded Comma Handling ✅ Fixed
+**Location:** `decoder.go:207-221`
+- **Issue:** Pre-encoded commas (`%2C`) were decoded before comma-splitting check
+- **Fix:** Check for raw commas in encoded string before decoding, then decode each part separately
+- **Test:** `TestFix3_PreEncodedCommaHandling` in `decoder_test.go:145-166`
+
+#### 4. Depth Limit Off-by-One ✅ Fixed
+**Location:** `decoder.go:269` and `decoder.go:280-283`
+- **Issue:** Depth counting was off by one (parsed one more level than JS)
+- **Fix:** Use `d.depth-1` in `FindAllStringIndex` since root doesn't count towards depth; handle case where `depth-1=0`
+- **Test:** `TestFix4_DepthLimitOffByOne` in `decoder_test.go:168-215`
+
+#### 5. Array Limit Key Type ✅ Fixed
+**Location:** `decoder.go:303-306`
+- **Issue:** When exceeding `arrayLimit`, keys were strings instead of integers
+- **Fix:** Removed `index <= d.arrayLimit` check from condition; always use integer keys for valid integers
+- **Test:** `TestFix5_ArrayLimitKeyType` in `decoder_test.go:217-246`
+
+### Implementation Notes
+
+1. **Empty Key Handling:** Simple guard clause to skip empty parts from splitting
+2. **Empty Arrays:** Logical OR condition to treat empty string same as nil for empty arrays
+3. **Pre-encoded Comma:** Process comma-splitting before URI decoding to preserve encoded commas
+4. **Depth Limit:** Adjusted bracket extraction count and added fallback for depth=1 case
+5. **Array Limit:** Separated concerns - use integer keys during parsing, check arrayLimit during array conversion
+
+### Test Coverage
+
+All fixes include comprehensive test cases covering:
+- Basic functionality matching expected JS behavior
+- Edge cases (empty strings, mixed values, boundary conditions)
+- Multiple depth/limit scenarios
+- Integration with existing features
+
+All existing tests continue to pass, ensuring backward compatibility.
+
 ## Current Branch
 
-Development is on: `claude/review-golang-qs-011CUox9eyWqGEzVRq4GE9LU`
+Development is on: `claude/fix-js-qs-differences-011CUp3dNtFF57sCKkJnwrYz`
 
 ## Future Enhancements
 

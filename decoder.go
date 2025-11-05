@@ -182,6 +182,11 @@ func (d *Decoder) parseValues(str string) map[string]interface{} {
 
 	result := make(map[string]interface{})
 	for _, part := range parts {
+		// Skip empty parts (e.g., from trailing delimiters like "a=1&")
+		if part == "" {
+			continue
+		}
+
 		bracketEqualsPos := strings.Index(part, "]=")
 		pos := bracketEqualsPos + 1
 		if bracketEqualsPos == -1 {
@@ -199,11 +204,20 @@ func (d *Decoder) parseValues(str string) map[string]interface{} {
 			}
 		} else {
 			key = decodeURI(part[0:pos])
-			strv := decodeURI(part[pos+1:])
-			if d.comma && strings.Contains(strv, ",") {
-				val = split(strv, ",")
+			encodedValue := part[pos+1:]
+
+			// Check for raw commas in the encoded string (not %2C)
+			// This ensures pre-encoded commas (%2C) are not split
+			if d.comma && strings.Contains(encodedValue, ",") {
+				// Split on raw commas, then decode each part
+				parts := strings.Split(encodedValue, ",")
+				decodedParts := make([]interface{}, len(parts))
+				for i, p := range parts {
+					decodedParts[i] = decodeURI(p)
+				}
+				val = decodedParts
 			} else {
-				val = strv
+				val = decodeURI(encodedValue)
 			}
 		}
 
@@ -246,11 +260,13 @@ func (d *Decoder) parseKeys(key string, val interface{}) QSType {
 	// deal with parent (a[b][c][d] => a)
 	loc := bracketReg.FindStringIndex(key)
 	if d.depth > 0 && loc != nil {
-		// push header
+		// push header (root key doesn't count towards depth)
 		keys = append(keys, key[0:loc[0]])
 
 		// deal with brackets
-		locs := bracketReg.FindAllStringIndex(key, d.depth)
+		// depth-1 because the root key doesn't count towards the depth limit
+		// e.g., depth=2 means: root + 1 bracket + 1 bracket
+		locs := bracketReg.FindAllStringIndex(key, d.depth-1)
 		if locs != nil {
 			for _, l := range locs {
 				keys = append(keys, key[l[0]:l[1]])
@@ -261,6 +277,9 @@ func (d *Decoder) parseKeys(key string, val interface{}) QSType {
 			if lastLoc[1] < len(key)-1 {
 				keys = append(keys, fmt.Sprintf("[%v]", key[lastLoc[1]:]))
 			}
+		} else if loc != nil {
+			// No brackets extracted due to depth limit (depth-1=0), add all remaining brackets as literal
+			keys = append(keys, fmt.Sprintf("[%v]", key[loc[0]:]))
 		}
 	} else {
 		// if depth is zero or can't find any bracket, add all
@@ -275,7 +294,8 @@ func (d *Decoder) parseKeys(key string, val interface{}) QSType {
 		root := keys[i]
 		if root == "[]" && d.parseArrays {
 			// f[]=3 => f : []string{"3"}
-			if d.allowEmptyArrays && leaf == nil {
+			// For empty arrays, check both nil and empty string
+			if d.allowEmptyArrays && (leaf == nil || leaf == "") {
 				obj = []interface{}{}
 			} else {
 				obj = concat([]interface{}{}, leaf)
@@ -295,8 +315,9 @@ func (d *Decoder) parseKeys(key string, val interface{}) QSType {
 			if !d.parseArrays && decodedRoot == "" {
 				// if we do not need parse array but there is a [], we use map and string key "0"
 				obj = QSType{"0": leaf}
-			} else if err == nil && root != decodedRoot && index >= 0 && (d.parseArrays && index <= d.arrayLimit) {
+			} else if err == nil && root != decodedRoot && index >= 0 && d.parseArrays {
 				// if we need parseArray, use number as the key here and try convert to array later
+				// Note: arrayLimit will be checked in objToArray to prevent conversion to array
 				obj = QSType{index: leaf}
 			} else {
 				// none above use key as it is
