@@ -22,6 +22,7 @@ type Decoder struct {
 	comma                    bool
 	decodeDotInKeys          bool
 	delimiter                string
+	delimiterRegex           *regexp.Regexp // regex delimiter, takes priority over string delimiter
 	depth                    int
 	duplicates               string
 	ignoreQueryPrefix        bool
@@ -115,6 +116,14 @@ func WithDelimiter(delimiter string) DecoderOption {
 	}
 }
 
+// WithDelimiterRegex sets a regex pattern for the delimiter
+// e.g., WithDelimiterRegex(`[;,]`) will split on both ; and ,
+func WithDelimiterRegex(pattern string) DecoderOption {
+	return func(d *Decoder) {
+		d.delimiterRegex = regexp.MustCompile(pattern)
+	}
+}
+
 func WithIgnoreQueryPrefix(ignoreQueryPrefix bool) DecoderOption {
 	return func(d *Decoder) {
 		d.ignoreQueryPrefix = ignoreQueryPrefix
@@ -124,6 +133,17 @@ func WithIgnoreQueryPrefix(ignoreQueryPrefix bool) DecoderOption {
 func WithAllowEmptyArrays(allowEmptyArrays bool) DecoderOption {
 	return func(d *Decoder) {
 		d.allowEmptyArrays = allowEmptyArrays
+	}
+}
+
+// WithDuplicates sets the behavior for duplicate keys
+// Options: "combine" (default), "first", "last"
+// - "combine": creates an array with all values
+// - "first": keeps only the first value
+// - "last": keeps only the last value
+func WithDuplicates(duplicates string) DecoderOption {
+	return func(d *Decoder) {
+		d.duplicates = duplicates
 	}
 }
 
@@ -164,6 +184,29 @@ func (d *Decoder) Parse(input string) (*QSType, error) {
 	return &ret, nil
 }
 
+// splitByDelimiter splits a string by delimiter (string or regex) with a limit
+func (d *Decoder) splitByDelimiter(str string, limit int) []string {
+	if d.delimiterRegex != nil {
+		// Use regex split
+		parts := d.delimiterRegex.Split(str, limit)
+		return parts
+	}
+	// Use string split
+	return strings.SplitN(str, d.delimiter, limit)
+}
+
+// findFirstDelimiter finds the first occurrence of delimiter (string or regex)
+func (d *Decoder) findFirstDelimiter(str string) int {
+	if d.delimiterRegex != nil {
+		loc := d.delimiterRegex.FindStringIndex(str)
+		if loc != nil {
+			return loc[0]
+		}
+		return -1
+	}
+	return strings.Index(str, d.delimiter)
+}
+
 // parse value in query string
 // return array for each query pair
 func (d *Decoder) parseValues(str string) map[string]interface{} {
@@ -173,10 +216,14 @@ func (d *Decoder) parseValues(str string) map[string]interface{} {
 	}
 
 	// split and keep limit number in parts
-	parts := strings.SplitN(str, d.delimiter, d.parameterLimit)
+	parts := d.splitByDelimiter(str, d.parameterLimit)
 	if len(parts) == d.parameterLimit {
 		last := parts[d.parameterLimit-1]
-		last, _, _ = strings.Cut(last, d.delimiter)
+		// Remove everything after the first delimiter in the last part
+		delimIndex := d.findFirstDelimiter(last)
+		if delimIndex >= 0 {
+			last = last[:delimIndex]
+		}
 		parts[d.parameterLimit-1] = last
 	}
 
@@ -226,8 +273,18 @@ func (d *Decoder) parseValues(str string) map[string]interface{} {
 		}
 
 		ev, existing := result[key]
-		if existing && d.duplicates == "combine" {
-			result[key] = combineValue(ev, val)
+		if existing {
+			switch d.duplicates {
+			case "combine":
+				result[key] = combineValue(ev, val)
+			case "first":
+				// Keep existing value, do nothing
+			case "last":
+				result[key] = val
+			default:
+				// Default behavior is same as "combine"
+				result[key] = combineValue(ev, val)
+			}
 		} else {
 			result[key] = val
 		}

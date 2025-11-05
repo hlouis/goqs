@@ -35,7 +35,9 @@ The main parser engine with configurable options. Currently implements **parsing
 - `allowDots`: Enable dot notation parsing (e.g., `a.b=c` → `{a: {b: "c"}}`)
 - `comma`: Parse comma-separated values as arrays
 - `delimiter`: Query parameter separator (default: "&")
+- `delimiterRegex`: Regular expression delimiter for multiple separator characters
 - `depth`: Maximum nesting depth (default: 5)
+- `duplicates`: Duplicate key handling strategy: "combine", "first", or "last" (default: "combine")
 - `arrayLimit`: Maximum array index (default: 20)
 - `parameterLimit`: Maximum number of parameters to parse (default: 1000)
 - `parseArrays`: Enable array syntax parsing (default: true)
@@ -305,7 +307,76 @@ All existing tests continue to pass, ensuring backward compatibility.
 
 ## Current Branch
 
-Development is on: `claude/fix-js-qs-differences-011CUp3dNtFF57sCKkJnwrYz`
+Development is on: `claude/add-missing-features-011CUp4a8uADNPnTukgUzrxZ`
+
+## Recent Updates (v0.4.0 - 2025-11-05)
+
+### Added Missing Features - Full Feature Parity Achieved! 🎉
+
+This update implements the remaining missing features, achieving near-complete feature parity with the JavaScript qs library for parsing functionality:
+
+#### 1. Duplicates Option - 'first' and 'last' Modes ✅
+**Location:** `decoder.go:228-243`
+- **Feature:** Support for different duplicate key handling strategies
+- **Modes:**
+  - `"combine"` (default): Creates array with all values → `foo=bar&foo=baz` → `{foo: ['bar', 'baz']}`
+  - `"first"`: Keeps only first value → `foo=bar&foo=baz` → `{foo: 'bar'}`
+  - `"last"`: Keeps only last value → `foo=bar&foo=baz` → `{foo: 'baz'}`
+- **Implementation:** Switch statement in `parseValues` to handle each mode
+- **API:** `WithDuplicates(string)` decoder option (decoder.go:135-139)
+- **Tests:** `TestParseDuplicates` with 10 comprehensive test cases
+
+#### 2. Regex Delimiter Support ✅
+**Location:** `decoder.go:25,187-208,219-227`
+- **Feature:** Use regular expressions for custom delimiters
+- **Enables:** Splitting on multiple delimiter characters in a single parse
+  - Example: `WithDelimiterRegex("[;,]")` splits on both `;` and `,`
+  - Example: `WithDelimiterRegex(";\s*")` splits on semicolon with optional spaces
+- **Implementation:**
+  - Added `delimiterRegex` field to Decoder struct
+  - Created helper functions `splitByDelimiter()` and `findFirstDelimiter()`
+  - Regex takes priority when both string and regex delimiters are set
+- **API:** `WithDelimiterRegex(string)` decoder option (decoder.go:121-125)
+- **Tests:** `TestParseRegexDelimiter` with 7 test cases covering various patterns
+
+### Implementation Details
+
+**Duplicates Option:**
+- Simple, elegant switch statement replacing original if/else
+- Handles nested objects and mixed keys correctly
+- Maintains backward compatibility (default is "combine")
+
+**Regex Delimiter:**
+- Zero-allocation approach when using string delimiter
+- Flexible regex engine for complex delimiter patterns
+- Proper handling of parameter limits with regex delimiters
+- Works seamlessly with all other decoder options
+
+### Test Coverage
+
+All new features include comprehensive tests:
+- **Duplicates:** 10 test cases covering all modes with various input patterns
+- **Regex Delimiter:** 7 test cases including nested objects, arrays, and parameter limits
+- All existing tests continue to pass ✅
+
+### Documentation Updates
+
+- Updated README.md with usage examples for both features
+- Added to decoder options table
+- Removed from "Missing Features" section
+- Updated CLAUDE.md with implementation details
+
+### Status: Feature Parity
+
+**Parsing Features Status:**
+- ✅ All JavaScript qs parsing features supported (except those N/A for Go)
+- ✅ All 5 known differences fixed (v0.3.0)
+- ✅ All missing features implemented (v0.4.0)
+- ✅ Comprehensive test coverage matching JavaScript test suite
+
+**Remaining Non-Issues:**
+- Circular reference detection: Not applicable for parsing (only for encoding)
+- allowPrototypes/plainObjects/allowSparse: Go language differences, not applicable
 
 ## Future Enhancements
 

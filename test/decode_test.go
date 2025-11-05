@@ -676,3 +676,150 @@ func TestParseWithCommaInValue(t *testing.T) {
 		})
 	}
 }
+
+// TestParseDuplicates tests the duplicates option (combine, first, last)
+func TestParseDuplicates(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      string
+		duplicates string
+		expected   *goqs.QSType
+	}{
+		{
+			name:       "duplicates combine (default)",
+			input:      "foo=bar&foo=baz",
+			duplicates: "combine",
+			expected:   &goqs.QSType{"foo": []interface{}{"bar", "baz"}},
+		},
+		{
+			name:       "duplicates first",
+			input:      "foo=bar&foo=baz",
+			duplicates: "first",
+			expected:   &goqs.QSType{"foo": "bar"},
+		},
+		{
+			name:       "duplicates last",
+			input:      "foo=bar&foo=baz",
+			duplicates: "last",
+			expected:   &goqs.QSType{"foo": "baz"},
+		},
+		{
+			name:       "duplicates first with multiple values",
+			input:      "a=1&a=2&a=3",
+			duplicates: "first",
+			expected:   &goqs.QSType{"a": "1"},
+		},
+		{
+			name:       "duplicates last with multiple values",
+			input:      "a=1&a=2&a=3",
+			duplicates: "last",
+			expected:   &goqs.QSType{"a": "3"},
+		},
+		{
+			name:       "duplicates combine with multiple values",
+			input:      "a=1&a=2&a=3",
+			duplicates: "combine",
+			expected:   &goqs.QSType{"a": []interface{}{"1", "2", "3"}},
+		},
+		{
+			name:       "duplicates first with nested objects",
+			input:      "a[b]=1&a[b]=2",
+			duplicates: "first",
+			expected:   &goqs.QSType{"a": goqs.QSType{"b": "1"}},
+		},
+		{
+			name:       "duplicates last with nested objects",
+			input:      "a[b]=1&a[b]=2",
+			duplicates: "last",
+			expected:   &goqs.QSType{"a": goqs.QSType{"b": "2"}},
+		},
+		{
+			name:       "duplicates first with mixed keys",
+			input:      "foo=bar&foo=baz&qux=quux",
+			duplicates: "first",
+			expected:   &goqs.QSType{"foo": "bar", "qux": "quux"},
+		},
+		{
+			name:       "duplicates last with mixed keys",
+			input:      "foo=bar&foo=baz&qux=quux",
+			duplicates: "last",
+			expected:   &goqs.QSType{"foo": "baz", "qux": "quux"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := goqs.NewDecoder(goqs.WithDuplicates(tt.duplicates))
+			result, err := d.Parse(tt.input)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestParseRegexDelimiter tests regex delimiter support
+func TestParseRegexDelimiter(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		pattern  string
+		expected *goqs.QSType
+	}{
+		{
+			name:     "semicolon or comma delimiter",
+			input:    "a=b;c=d,e=f",
+			pattern:  `[;,]`,
+			expected: &goqs.QSType{"a": "b", "c": "d", "e": "f"},
+		},
+		{
+			name:     "semicolon with optional spaces",
+			input:    "a=b; c=d;  e=f",
+			pattern:  `;\s*`,
+			expected: &goqs.QSType{"a": "b", "c": "d", "e": "f"},
+		},
+		{
+			name:     "pipe or ampersand delimiter",
+			input:    "foo=bar|baz=qux&quux=corge",
+			pattern:  `[|&]`,
+			expected: &goqs.QSType{"foo": "bar", "baz": "qux", "quux": "corge"},
+		},
+		{
+			name:     "nested objects with regex delimiter",
+			input:    "a[b]=1;a[c]=2,d=3",
+			pattern:  `[;,]`,
+			expected: &goqs.QSType{"a": goqs.QSType{"b": "1", "c": "2"}, "d": "3"},
+		},
+		{
+			name:     "arrays with regex delimiter",
+			input:    "a[]=1;a[]=2,a[]=3",
+			pattern:  `[;,]`,
+			expected: &goqs.QSType{"a": []interface{}{"1", "2", "3"}},
+		},
+		{
+			name:     "multiple character delimiter pattern",
+			input:    "a=1&&b=2||c=3",
+			pattern:  `(&&|\|\|)`,
+			expected: &goqs.QSType{"a": "1", "b": "2", "c": "3"},
+		},
+		{
+			name:     "regex delimiter with parameter limit",
+			input:    "a=1;b=2,c=3;d=4",
+			pattern:  `[;,]`,
+			expected: &goqs.QSType{"a": "1", "b": "2"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := []goqs.DecoderOption{goqs.WithDelimiterRegex(tt.pattern)}
+			// For the parameter limit test
+			if tt.name == "regex delimiter with parameter limit" {
+				opts = append(opts, goqs.WithParameterLimit(2))
+			}
+			d := goqs.NewDecoder(opts...)
+			result, err := d.Parse(tt.input)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
