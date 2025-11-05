@@ -79,6 +79,54 @@ func WithAllowDots(allowDots bool) DecoderOption {
 	}
 }
 
+func WithDecodeDotInKeys(decodeDotInKeys bool) DecoderOption {
+	return func(d *Decoder) {
+		d.decodeDotInKeys = decodeDotInKeys
+	}
+}
+
+func WithStrictNullHandling(strictNullHandling bool) DecoderOption {
+	return func(d *Decoder) {
+		d.strictNullHandling = strictNullHandling
+	}
+}
+
+func WithDepth(depth int) DecoderOption {
+	return func(d *Decoder) {
+		d.depth = depth
+	}
+}
+
+func WithArrayLimit(arrayLimit int) DecoderOption {
+	return func(d *Decoder) {
+		d.arrayLimit = arrayLimit
+	}
+}
+
+func WithParameterLimit(parameterLimit int) DecoderOption {
+	return func(d *Decoder) {
+		d.parameterLimit = parameterLimit
+	}
+}
+
+func WithDelimiter(delimiter string) DecoderOption {
+	return func(d *Decoder) {
+		d.delimiter = delimiter
+	}
+}
+
+func WithIgnoreQueryPrefix(ignoreQueryPrefix bool) DecoderOption {
+	return func(d *Decoder) {
+		d.ignoreQueryPrefix = ignoreQueryPrefix
+	}
+}
+
+func WithAllowEmptyArrays(allowEmptyArrays bool) DecoderOption {
+	return func(d *Decoder) {
+		d.allowEmptyArrays = allowEmptyArrays
+	}
+}
+
 func NewDecoder(options ...DecoderOption) *Decoder {
 	d := defaultDecoder
 
@@ -234,7 +282,7 @@ func (d *Decoder) parseKeys(key string, val interface{}) QSType {
 			}
 		} else {
 			cleanRoot := root
-			if root[0] == '[' && root[len(root)-1] == ']' {
+			if len(root) > 0 && root[0] == '[' && root[len(root)-1] == ']' {
 				cleanRoot = root[1 : len(root)-1]
 			}
 
@@ -420,6 +468,9 @@ func arrayToObj(arr []interface{}) QSType {
 // 2. All number keys is continued
 // return origin value if not ok to convert, or an new array
 func objToArray(obj interface{}) interface{} {
+	if obj == nil {
+		return obj
+	}
 	if reflect.TypeOf(obj).Kind() != reflect.Map {
 		return obj
 	}
