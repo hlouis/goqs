@@ -84,6 +84,10 @@ d := goqs.NewDecoder(goqs.WithComma(true))
 d := goqs.NewDecoder(goqs.WithDelimiter(";"))
 result, _ := d.Parse("a=b;c=d")
 
+// Regex delimiter (split on multiple characters)
+d := goqs.NewDecoder(goqs.WithDelimiterRegex(`[;,]`))
+result, _ := d.Parse("a=b;c=d,e=f")  // {"a": "b", "c": "d", "e": "f"}
+
 // Ignore query prefix
 d := goqs.NewDecoder(goqs.WithIgnoreQueryPrefix(true))
 result, _ := d.Parse("?foo=bar")  // Ignores the "?"
@@ -95,6 +99,16 @@ result, _ := d.Parse("?foo=bar")  // Ignores the "?"
 // Null handling
 d := goqs.NewDecoder(goqs.WithStrictNullHandling(true))
 result, _ := d.Parse("foo")  // {"foo": nil} instead of {"foo": ""}
+
+// Duplicate key handling
+d := goqs.NewDecoder(goqs.WithDuplicates("first"))
+result, _ := d.Parse("foo=bar&foo=baz")  // {"foo": "bar"}
+
+d = goqs.NewDecoder(goqs.WithDuplicates("last"))
+result, _ = d.Parse("foo=bar&foo=baz")  // {"foo": "baz"}
+
+d = goqs.NewDecoder(goqs.WithDuplicates("combine"))  // default
+result, _ = d.Parse("foo=bar&foo=baz")  // {"foo": ["bar", "baz"]}
 
 // Depth limit (default: 5)
 d := goqs.NewDecoder(goqs.WithDepth(3))
@@ -127,7 +141,9 @@ result, _ := d.Parse("name%252Eobj.first=John")
 | `WithComma` | `bool` | `false` | Parse comma-separated values as arrays |
 | `WithDecodeDotInKeys` | `bool` | `false` | Decode %2E as literal dots in keys |
 | `WithDelimiter` | `string` | `"&"` | Query string delimiter |
+| `WithDelimiterRegex` | `string` | `nil` | Regex pattern for delimiter (e.g., `[;,]`) |
 | `WithDepth` | `int` | `5` | Maximum nesting depth |
+| `WithDuplicates` | `string` | `"combine"` | Duplicate key handling: `combine`, `first`, or `last` |
 | `WithArrayLimit` | `int` | `20` | Maximum array index |
 | `WithParameterLimit` | `int` | `1000` | Maximum number of parameters |
 | `WithIgnoreQueryPrefix` | `bool` | `false` | Ignore leading `?` |
@@ -354,10 +370,8 @@ Currently, there are **no known behavioral differences** between this Go impleme
 - **Buffer encoding**: Not implemented
 
 #### Missing Features
-- **duplicates option**: Only `'combine'` mode supported (not `'first'` or `'last'`)
-- **Circular reference detection**: Will cause stack overflow
-- **Regex delimiters**: Only string delimiters supported
-- **allowPrototypes/plainObjects/allowSparse**: Not applicable to Go
+- **Circular reference detection**: Not applicable for parsing (only relevant for encoding, which goqs does support)
+- **allowPrototypes/plainObjects/allowSparse**: Not applicable to Go (language-level differences)
 
 ### 🔧 Go-Specific Considerations
 
